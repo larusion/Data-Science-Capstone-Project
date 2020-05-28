@@ -1,0 +1,181 @@
+---
+title: "Data Science Capstone"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exploratory Data Analysis
+
+We present an exploratory data analysis report for JHU/SwiftKey Capstone Project. As a first step towards building a predictive model for text, we investigate the distribution and relationship between the words, tokens, and phrases in the text.
+
+We begin with loading the necessary libraries and the dataset provided with us. We unzip the dataset and read the en_US files of Twitter, Blogs, and News into character vectors in R while removing the non-ASCII characters.
+
+```{r message=FALSE}
+library(tm)
+library(RWeka)
+library(wordcloud)
+library(ggplot2)
+```
+
+
+```{r dataset}
+if (!file.exists("Coursera-SwiftKey.zip"))
+  download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip","Coursera-SwiftKey.zip")
+
+unzip("Coursera-SwiftKey.zip")
+
+data_blogs <- readLines("final/en_US/en_US.blogs.txt", warn = FALSE, encoding = "UTF-8", skipNul = TRUE)
+data_news <- readLines("final/en_US/en_US.news.txt", warn = FALSE, encoding = "UTF-8", skipNul = TRUE)
+data_twitter <- readLines("final/en_US/en_US.twitter.txt", warn = FALSE, encoding = "UTF-8", skipNul = TRUE)
+
+data_blogs <- iconv(data_blogs, "UTF-8", "ASCII", sub="")
+data_news <- iconv(data_news, "UTF-8", "ASCII", sub="")
+data_twitter <- iconv(data_twitter, "UTF-8", "ASCII", sub="")
+```
+
+Then, we summarize the basic statistics that include the size, number of rows, total characters of the file, and the number of characters of the longest row in each one.
+```{r summary}
+summary <- data.frame("File_Name"= c("Blogs","News","Twitter"),
+                      "File_Size"=paste(c(file.info("final/en_US/en_US.blogs.txt")$size/2^20, 
+                                           file.info("final/en_US/en_US.news.txt")$size/2^20, 
+                                           file.info("final/en_US/en_US.twitter.txt")$size/2^20),"MB"),
+                      "Number_of_Rows"=sapply(list(data_blogs, data_news, data_twitter), function(x){length(x)}),
+                      "Total_Characters"=sapply(list(data_blogs, data_news, data_twitter), function(x){sum(nchar(x))}),
+                      "Longest_Row"=sapply(list(data_blogs, data_news, data_twitter), function(x) {max(unlist(lapply(x,function(y) nchar(y))))}), stringsAsFactors = FALSE)
+
+summary
+```
+Having seen that the overall data size is large, we randomly sample each by  0.5%.
+
+```{r sampling}
+set.seed(1120)
+test_data <- c(sample(data_blogs, length(data_blogs) * 0.005),
+               sample(data_news, length(data_news) * 0.005),
+```
+
+
+```{r sampling}
+sample(data_twitter, length(data_twitter) * 0.005))
+```
+As preparation for word frequency analysis, we continue with data cleaning with the help of the text mining library 'tm' loaded in the beginning. The cleaning steps performed can be ordered as follows:
+
+1. Converting the corpus to lowercase
+2. Removing punctuation marks
+3. Removing numbers
+4. Removing stopwords
+5. Removing words associated with profanity
+6. Removing extra whitespaces
+7. Creating a plain text document
+8. Stemming 
+
+
+
+
+```{r cleaning}
+sample_corpus <- VCorpus(VectorSource(test_data))
+
+sample_corpus <- tm_map(sample_corpus, tolower)
+sample_corpus <- tm_map(sample_corpus, removePunctuation)
+sample_corpus <- tm_map(sample_corpus, removeNumbers)
+
+#Read in Profanity List
+if (!file.exists("bad_words.txt")){
+  download.file(url = "https://raw.githubusercontent.com/shutterstock/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en", destfile = "bad_words.txt")}
+profanity <- readLines('bad_words.txt')
+
+sample_corpus <- tm_map(sample_corpus, removeWords, profanity)
+sample_corpus <- tm_map(sample_corpus, removeWords, stopwords('english'))
+sample_corpus <- tm_map(sample_corpus, stripWhitespace)
+sample_corpus <- tm_map(sample_corpus, PlainTextDocument)
+sample_corpus <- tm_map(sample_corpus, stemDocument)
+```
+
+#### The Distribution of Word and Word Pairs in the Data
+
+Finally, we investigate the distributions of unigram, bigram, and trigram frequencies by tokenizing the data as given below:
+
+```{r tokenization}
+unigram <- function(x) NGramTokenizer(x, Weka_control(min=1, max=1))
+bigram <- function(x) NGramTokenizer(x, Weka_control(min=2, max=2))
+trigram <- function(x) NGramTokenizer(x, Weka_control(min=3, max=3))
+
+unitdf <- TermDocumentMatrix(sample_corpus, control=list(tokenize=unigram))
+bitdf <- TermDocumentMatrix(sample_corpus, control=list(tokenize=bigram))
+tritdf <- TermDocumentMatrix(sample_corpus, control=list(tokenize=trigram))
+
+
+
+uni_tf <- findFreqTerms(unitdf, lowfreq=80)
+bi_tf <- findFreqTerms(bitdf, lowfreq=40)
+tri_tf <- findFreqTerms(tritdf, lowfreq=10)
+```
+
+
+```{r uni}
+uni_freq <- sort(rowSums(as.matrix(unitdf[uni_tf,])), decreasing=TRUE)
+uni_freq <- data.frame(words=names(uni_freq), frequency=uni_freq)
+head(uni_freq)
+```
+
+```{r bi}
+bi_freq <- sort(rowSums(as.matrix(bitdf[bi_tf,])), decreasing = TRUE)
+bi_freq <- data.frame(words=names(bi_freq), frequency=bi_freq)
+
+head(bi_freq)
+```
+
+```{r tri}
+tri_freq <- sort(rowSums(as.matrix(tritdf[tri_tf,])), decreasing = TRUE)
+tri_freq <- data.frame(words=names(tri_freq), frequency=tri_freq)
+
+head(tri_freq)
+```
+
+The following histograms and wordcloud figures depict the variation in the frequencies of words and word pairs in the data.
+
+### Unigrams
+```{r message=FALSE}
+wordcloud(words=uni_freq$words, freq=uni_freq$frequency, max.words=20, colors = brewer.pal(8, "Dark2"))
+```
+
+```{r plot_uni}
+ggplot(uni_freq[1:25, ], aes(factor(words, levels = unique(words)), frequency)) +
+  geom_bar(stat = 'identity', fill="red") +
+  theme(axis.text.x = element_text(angle=90)) +
+  xlab('Unigram') +
+  ylab('Frequency')
+```
+
+### Bigrams
+```{r message=FALSE, warning=FALSE}
+wordcloud(words=bi_freq$words, freq=bi_freq$frequency, max.words=15, colors = brewer.pal(8, "Dark2"))
+```
+
+```{r message=FALSE}
+ggplot(bi_freq, aes(factor(words, levels = unique(words)), frequency)) +
+  geom_bar(stat = 'identity', fill="red") +
+  theme(axis.text.x = element_text(angle=90)) +
+  xlab('Bigram') +
+  ylab('Frequency')
+```
+
+### Trigrams
+```{r message=FALSE, warning=FALSE}
+wordcloud(words=tri_freq$words, freq=tri_freq$frequency, max.words=10, colors = brewer.pal(8, "Dark2"))
+```
+
+```{r plot_tri}
+ggplot(tri_freq, aes(factor(words, levels = unique(words)), frequency)) +
+  geom_bar(stat = 'identity', fill="red") +
+  theme(axis.text.x = element_text(angle=90)) +
+  xlab('Trigram') +
+  ylab('Frequency')
+```
+
+
+We are going to use the Recurrent Neural Network (RNN) to build the predictive model for text.
