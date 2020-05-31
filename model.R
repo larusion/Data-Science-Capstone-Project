@@ -46,7 +46,7 @@ predictors <- input_sequences[, 1:(max_sequence_len-1)]
 labels <- input_sequences[, max_sequence_len]
 labels <- as.array(labels)
 
-embedding_dim <- 16
+embedding_dim <- 100
 
 
 k_clear_session()
@@ -54,7 +54,6 @@ k_clear_session()
 model <- keras_model_sequential() %>% 
   layer_embedding(input_dim = total_words, output_dim = embedding_dim, 
                   input_length = max_sequence_len-1) %>% 
-  layer_flatten() %>% 
   layer_lstm(128, return_sequences = TRUE) %>%
   layer_dropout(0.2) %>%
   layer_lstm(16) %>%
