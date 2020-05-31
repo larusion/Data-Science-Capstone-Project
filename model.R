@@ -1,30 +1,12 @@
-
-set.seed(42)
-
 library(keras)
 library(tidyr)
-#use_session_with_seed(42)
-tensorflow::tf$random$set_seed(42)
-
-tf$set_random_seed(42)
-
 
 
 data_twitter <- readLines("final/en_US/en_US.twitter.txt", warn = FALSE, encoding = "UTF-8", skipNul = TRUE)
 
 data_twitter <- iconv(data_twitter, "UTF-8", "ASCII", sub="")
 
-object.size(data_twitter)
-
-length(data_twitter)
-
-
 data_twitter <- sample(data_twitter, length(data_twitter) * 0.001)
-
-object.size(data_twitter)
-
-length(data_twitter)
-
 
 
 tokenizer <- text_tokenizer() %>% 
@@ -62,7 +44,6 @@ input_sequences <- as.array(pad_sequences(input_sequences, maxlen = max_sequence
 predictors <- input_sequences[, 1:(max_sequence_len-1)]
 
 labels <- input_sequences[, max_sequence_len]
-#labels <- to_categorical(labels, num_classes = total_words)
 labels <- as.array(labels)
 
 embedding_dim <- 16
@@ -74,10 +55,10 @@ model <- keras_model_sequential() %>%
   layer_embedding(input_dim = total_words, output_dim = embedding_dim, 
                   input_length = max_sequence_len-1) %>% 
   layer_flatten() %>% 
-  #layer_lstm(128, return_sequences = TRUE) %>%
-  #layer_dropout(0.2) %>%
-  #layer_lstm(16) %>%
-  #layer_dropout(0.2) %>%
+  layer_lstm(128, return_sequences = TRUE) %>%
+  layer_dropout(0.2) %>%
+  layer_lstm(16) %>%
+  layer_dropout(0.2) %>%
   layer_dense(units = 16, activation = "relu") %>% 
   layer_dense(units = total_words, activation = "softmax")
 
@@ -95,28 +76,5 @@ history <- model %>% fit(
   predictors, labels,
   epochs = 120,
   batch_size = 32
-  #validation_split = 0.1
+  validation_split = 0.1
 )
-
-save_model_hdf5(model, "nlp_model.h5")
-
-plot(history)
-
-model %>% evaluate(x_test, y_test,verbose = 0)
-
-model %>% predict_classes(x_test)
-
-save_model_tf(model, "nlp-twitter/")
-
-# Load the model
-model <- load_model_tf("nlp/")
-
-fileConn<-file("output3.txt")
-writeLines(data_twitter, fileConn)
-close(fileConn)
-
-save_text_tokenizer(tokenizer, "hdf")
-
-tokenizer <- load_text_tokenizer("twitter")
-
-save_model_weights_hdf5(model, "pre_trained_glove_model.h5")
