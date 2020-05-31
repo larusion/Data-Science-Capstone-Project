@@ -77,3 +77,9 @@ history <- model %>% fit(
   batch_size = 32
   validation_split = 0.1
 )
+
+
+save_model_hdf5(model, "nlp_model.h5")
+
+save_text_tokenizer(tokenizer, "ls")
+
